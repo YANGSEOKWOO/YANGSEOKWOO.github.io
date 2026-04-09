@@ -1,0 +1,24 @@
+title: Seokwoo's Dev Blog
+description: 배우고 기록하는 개발 블로그
+url: "https://yangseokwoo.github.io"
+baseurl: ""
+
+markdown: kramdown
+highlighter: rouge
+permalink: /:categories/:title/
+
+collections:
+  posts:
+    output: true
+
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md

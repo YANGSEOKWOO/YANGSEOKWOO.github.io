@@ -1,0 +1,57 @@
+---
+layout: default
+title: Home
+---
+<div class="home-header">
+  <h1>{{ site.title }}</h1>
+  <p>{{ site.description }}</p>
+</div>
+
+<div class="category-filter">
+  <button class="filter-btn active" data-category="all">All</button>
+  <button class="filter-btn" data-category="Programming">Programming</button>
+  <button class="filter-btn" data-category="CS">CS</button>
+  <button class="filter-btn" data-category="Project">Project</button>
+  <button class="filter-btn" data-category="AI">AI</button>
+</div>
+
+<div class="card-grid">
+  {% for post in site.posts %}
+  <a href="{{ post.url | relative_url }}" class="card" data-category="{{ post.category }}">
+    <div class="card-body">
+      <span class="card-category">{{ post.category }}</span>
+      <h2 class="card-title">{{ post.title }}</h2>
+      {% if post.description %}
+      <p class="card-description">{{ post.description }}</p>
+      {% endif %}
+      <div class="card-footer">
+        <span class="card-date">{{ post.date | date: "%Y.%m.%d" }}</span>
+        {% if post.tags %}
+        <div class="card-tags">
+          {% for tag in post.tags limit:3 %}
+          <span class="tag-small">{{ tag }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<script>
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const category = btn.dataset.category;
+    document.querySelectorAll('.card').forEach(card => {
+      if (category === 'all' || card.dataset.category === category) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+});
+</script>
