@@ -1,0 +1,163 @@
+---
+layout: default
+title: Graph
+permalink: /graph/
+---
+<div class="graph-page">
+  <h1 class="category-title">지식 그래프</h1>
+  <p class="category-description">글과 글 사이의 연결을 카테고리별로 묶어 보여줍니다. 노드를 클릭하면 글로 이동합니다.</p>
+
+  <div class="category-filter" id="graph-filter">
+    <button class="filter-btn active" data-category="all">All</button>
+    <button class="filter-btn" data-category="Programming">Programming</button>
+    <button class="filter-btn" data-category="CS">CS</button>
+    <button class="filter-btn" data-category="Project">Project</button>
+    <button class="filter-btn" data-category="AI">AI</button>
+  </div>
+
+  <div id="graph-wrap">
+    <div id="graph"></div>
+    <p id="graph-empty" class="empty-message" hidden>아직 글이 없어 그래프를 그릴 수 없습니다. 글을 추가한 뒤 <code>/graph</code>로 연결을 분석하세요.</p>
+    <div class="graph-legend">
+      <span class="legend-item"><i style="background:#9065b0"></i>Programming</span>
+      <span class="legend-item"><i style="background:#0fa968"></i>CS</span>
+      <span class="legend-item"><i style="background:#e0823d"></i>Project</span>
+      <span class="legend-item"><i style="background:#2eaadc"></i>AI</span>
+    </div>
+  </div>
+</div>
+
+<style>
+  #graph-wrap { position: relative; }
+  #graph {
+    width: 100%;
+    height: 68vh;
+    min-height: 420px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-secondary);
+  }
+  .graph-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 16px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+  .graph-legend .legend-item { display: flex; align-items: center; gap: 6px; }
+  .graph-legend i {
+    width: 11px; height: 11px; border-radius: 50%; display: inline-block;
+  }
+</style>
+
+<!-- 노드는 Jekyll이 site.posts에서 자동 생성한다 (항상 최신). 엣지는 /graph가 만든 graph-data.json에서 온다. -->
+<script>
+  const POSTS = [
+    {% for post in site.posts %}
+    {
+      id: {{ post.slug | jsonify }},
+      label: {{ post.title | jsonify }},
+      group: {{ post.category | jsonify }},
+      url: {{ post.url | relative_url | jsonify }}
+    }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ];
+  const GRAPH_DATA_URL = {{ "/assets/graph-data.json" | relative_url | jsonify }};
+</script>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script>
+  (function () {
+    const GROUP_COLORS = {
+      Programming: "#9065b0",
+      CS: "#0fa968",
+      Project: "#e0823d",
+      AI: "#2eaadc"
+    };
+
+    if (!POSTS.length) {
+      document.getElementById("graph").hidden = true;
+      document.getElementById("graph-empty").hidden = false;
+      return;
+    }
+
+    const nodes = new vis.DataSet(
+      POSTS.map(function (p) {
+        return { id: p.id, label: p.label, group: p.group, url: p.url, title: p.label };
+      })
+    );
+
+    const groupOptions = {};
+    Object.keys(GROUP_COLORS).forEach(function (g) {
+      groupOptions[g] = {
+        color: {
+          background: GROUP_COLORS[g],
+          border: GROUP_COLORS[g],
+          highlight: { background: GROUP_COLORS[g], border: "#37352f" }
+        },
+        font: { color: "#37352f" }
+      };
+    });
+
+    const network = new vis.Network(
+      document.getElementById("graph"),
+      { nodes: nodes, edges: new vis.DataSet([]) },
+      {
+        nodes: {
+          shape: "dot",
+          size: 14,
+          font: { face: "Inter, 'Noto Sans KR', sans-serif", size: 13 },
+          borderWidth: 2
+        },
+        edges: {
+          color: { color: "#d9d8d4", highlight: "#787774" },
+          width: 1.5,
+          smooth: { type: "continuous" }
+        },
+        groups: groupOptions,
+        physics: {
+          solver: "forceAtlas2Based",
+          forceAtlas2Based: { gravitationalConstant: -45, springLength: 110 },
+          stabilization: { iterations: 150 }
+        },
+        interaction: { hover: true, tooltipDelay: 120 }
+      }
+    );
+
+    // 노드 클릭 → 해당 글로 이동
+    network.on("click", function (params) {
+      if (params.nodes.length) {
+        const node = nodes.get(params.nodes[0]);
+        if (node && node.url) window.location.href = node.url;
+      }
+    });
+
+    // 엣지는 /graph가 분석해 둔 graph-data.json에서 로드
+    fetch(GRAPH_DATA_URL)
+      .then(function (r) { return r.ok ? r.json() : { edges: [] }; })
+      .then(function (data) {
+        const ids = new Set(POSTS.map(function (p) { return p.id; }));
+        const edges = (data.edges || [])
+          .filter(function (e) { return ids.has(e.from) && ids.has(e.to); })
+          .map(function (e) { return { from: e.from, to: e.to, title: e.reason || "" }; });
+        network.setData({ nodes: nodes, edges: new vis.DataSet(edges) });
+      })
+      .catch(function () { /* graph-data.json 없으면 노드만 표시 */ });
+
+    // 카테고리 필터
+    document.querySelectorAll("#graph-filter .filter-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll("#graph-filter .filter-btn").forEach(function (b) {
+          b.classList.remove("active");
+        });
+        btn.classList.add("active");
+        const cat = btn.dataset.category;
+        nodes.update(
+          POSTS.map(function (p) {
+            return { id: p.id, hidden: cat !== "all" && p.group !== cat };
+          })
+        );
+      });
+    });
+  })();
+</script>
