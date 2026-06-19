@@ -422,3 +422,15 @@ a {
     padding: 24px 16px;
   }
 }
+
+/* === Mermaid 다이어그램 === */
+.mermaid {
+  margin: 1.75rem 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}

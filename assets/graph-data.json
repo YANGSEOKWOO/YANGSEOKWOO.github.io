@@ -1,4 +1,10 @@
 {
   "generated": "2026-06-19",
-  "edges": []
+  "edges": [
+    { "from": "aws-ec2-credential-chain", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" },
+    { "from": "aws-ec2-credential-chain", "to": "kubernetes-volume-model-pv-pvc-accessmode", "reason": "본문 링크" },
+    { "from": "aws-ec2-credential-chain", "to": "python-web-server-async-stack", "reason": "본문 링크" },
+    { "from": "miso-sheet-analysis-eks-migration", "to": "kubernetes-volume-model-pv-pvc-accessmode", "reason": "본문 링크" },
+    { "from": "flask-gunicorn-gevent-architecture", "to": "python-web-server-async-stack", "reason": "tag: gunicorn / gevent / Python" }
+  ]
 }
