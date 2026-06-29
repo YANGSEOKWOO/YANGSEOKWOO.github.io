@@ -4,7 +4,7 @@ title: "K8s 핵심 동작 원리 — desired state 와 reconciliation loop 바�
 description: "Deployment·Service 는 쓸 줄 알지만 '속이 어떻게 도는지' 가 비었다면 — Control Plane / Worker, desired state, control loop 를 직접 Pod 죽여가며 확인한 노트"
 category: CS
 tags: [Kubernetes, ControlLoop, DesiredState, Reconciliation, ReplicaSet, Service, Infra]
-date: 2026-06-30
+date: 2026-06-30 00:00:00 +0900
 ---
 
 ## 한 줄 정의 (Feynman)
