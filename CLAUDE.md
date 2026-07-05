@@ -21,12 +21,13 @@ bundle exec jekyll build        # _site/ 로 정적 빌드
 ## 글(post) 규약 — 중요
 
 - 글은 `_posts/YYYY-MM-DD-<영문-슬러그>.md`에 둔다. (`_posts/` 폴더는 아직 없을 수 있으니 없으면 만든다.)
-- 프론트매터는 **단수** `category`를 쓰며, 값은 정확히 `AI` / `CS` / `Project` / `Programming` 중 하나여야 한다. 이 값이 다음 세 곳과 **대소문자까지 일치**해야 동작한다:
+- 프론트매터는 **단수** `category`를 쓰며, 값은 정확히 `AI` / `CS` / `Project` / `Programming` / `Certificate` 중 하나여야 한다. 이 값이 다음 네 곳과 **대소문자까지 일치**해야 동작한다:
   - `index.html`의 카테고리 필터 버튼 `data-category`
+  - `_includes/header.html`의 네비게이션 링크 (`/categories/<소문자>`)
   - `categories/*.md`의 `category_key` (카테고리 페이지는 `where: "category", page.category_key`로 필터링)
-  - `graph.html`의 그룹 색상 매핑
+  - `graph.html`의 카테고리 필터 버튼 · 범례 · 그룹 색상 매핑(`GROUP_COLORS`)
 - 퍼머링크는 `_config.yml`의 `/:categories/:title/`.
-- `_templates/`의 `ai.md`/`cs.md`/`project.md`/`programming.md`는 **발행되지 않는다** (`_config.yml`의 `exclude`). 새 글의 골격 템플릿이며, "내가 오해하고 있던 것 / trade-off / 관련 글 링크" 같은 학습 회고 구조를 강제한다.
+- `_templates/`의 `ai.md`/`cs.md`/`project.md`/`programming.md`/`certificate.md`는 **발행되지 않는다** (`_config.yml`의 `exclude`). 새 글의 골격 템플릿이며, "내가 오해하고 있던 것 / trade-off / 관련 글 링크" 같은 학습 회고 구조를 강제한다.
 
 ## 지식 그래프 (`/graph`, `graph.html`)
 
