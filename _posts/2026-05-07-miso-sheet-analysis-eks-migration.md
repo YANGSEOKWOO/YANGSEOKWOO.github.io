@@ -30,6 +30,7 @@ EKS 환경의 제약:
 ## 2. 가능했던 해결책들
 
 ### Docker spawn 방식
+
 | 옵션 | 장점 | 단점 |
 |---|---|---|
 | A. DinD 사이드카 | docker-compose 시절 코드 그대로 동작 | privileged 필요, 보안 ↓ |
@@ -37,6 +38,7 @@ EKS 환경의 제약:
 | C. host docker.sock hostPath | 단순 | EKS 는 containerd 라 docker.sock 자체가 없음 (불가) |
 
 ### 파일 공유 방식
+
 | 옵션 | 장점 | 단점 |
 |---|---|---|
 | A. EFS PVC (RWX) | 다중 Pod 동시 mount, 코드 그대로 | EFS 비용·지연 |
@@ -44,6 +46,7 @@ EKS 환경의 제약:
 | C. S3 + storage abstraction | 클라우드 native | 코드 패치 필요 |
 
 ### ECR repo 명명 컨벤션
+
 | 옵션 | 장점 | 단점 |
 |---|---|---|
 | A. 처음 직관 (`miso/sheet-analysis-main` 슬래시) | "miso 그룹" 으로 묶임 | self-hosted api 코드(`miso-sheet-analysis-main` 대시) 와 불일치 |

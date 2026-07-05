@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-30",
+  "generated": "2026-07-05",
   "edges": [
     { "from": "aws-ec2-credential-chain", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" },
     { "from": "aws-ec2-credential-chain", "to": "kubernetes-volume-model-pv-pvc-accessmode", "reason": "본문 링크" },
@@ -8,6 +8,9 @@
     { "from": "kubernetes-desired-state-reconciliation", "to": "kubernetes-volume-model-pv-pvc-accessmode", "reason": "본문 링크" },
     { "from": "kubernetes-desired-state-reconciliation", "to": "python-web-server-async-stack", "reason": "본문 링크" },
     { "from": "kubernetes-desired-state-reconciliation", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" },
-    { "from": "flask-gunicorn-gevent-architecture", "to": "python-web-server-async-stack", "reason": "tag: gunicorn / gevent / Python" }
+    { "from": "flask-gunicorn-gevent-architecture", "to": "python-web-server-async-stack", "reason": "tag: gunicorn / gevent / Python" },
+    { "from": "db-connection-pool-from-scratch", "to": "flask-gunicorn-gevent-architecture", "reason": "본문 링크" },
+    { "from": "db-connection-pool-from-scratch", "to": "python-web-server-async-stack", "reason": "본문 링크" },
+    { "from": "db-connection-pool-from-scratch", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" }
   ]
 }
