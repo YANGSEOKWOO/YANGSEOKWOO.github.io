@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>비동기 인프라 아키텍처 — Q&A와 설계 회고</title>
+<style>
+  :root {
+    --bg: #eef1f5;
+    --surface: #ffffff;
+    --surface-2: #f5f8fb;
+    --ink: #131824;
+    --ink-2: #46536a;
+    --ink-3: #6e7a8e;
+    --line: #dbe2ec;
+    --line-2: #e8edf4;
+    --accent: #0c8e82;
+    --accent-ink: #0a6a61;
+    --accent-wash: #e2f2f0;
+    --ok: #1f8f52;
+    --warn: #b5730f;
+    --crit: #c93a54;
+    --ok-wash: #e4f3ea;
+    --warn-wash: #f6eddc;
+    --crit-wash: #f7e5e9;
+
+    --mono: "SF Mono", "JetBrains Mono", "Menlo", "Consolas", ui-monospace, monospace;
+    --sans: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", system-ui, sans-serif;
+
+    --maxw: 940px;
+    --r: 14px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0f16;
+      --surface: #141a24;
+      --surface-2: #1a212d;
+      --ink: #e7ecf3;
+      --ink-2: #9fabbd;
+      --ink-3: #6c778a;
+      --line: #262e3b;
+      --line-2: #202734;
+      --accent: #2fd4c0;
+      --accent-ink: #5eead6;
+      --accent-wash: #12292a;
+      --ok: #37c477;
+      --warn: #dca343;
+      --crit: #ef6f88;
+      --ok-wash: #12271b;
+      --warn-wash: #2a2213;
+      --crit-wash: #2a161c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c0f16;
+    --surface: #141a24;
+    --surface-2: #1a212d;
+    --ink: #e7ecf3;
+    --ink-2: #9fabbd;
+    --ink-3: #6c778a;
+    --line: #262e3b;
+    --line-2: #202734;
+    --accent: #2fd4c0;
+    --accent-ink: #5eead6;
+    --accent-wash: #12292a;
+    --ok: #37c477;
+    --warn: #dca343;
+    --crit: #ef6f88;
+    --ok-wash: #12271b;
+    --warn-wash: #2a2213;
+    --crit-wash: #2a161c;
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f5;
+    --surface: #ffffff;
+    --surface-2: #f5f8fb;
+    --ink: #131824;
+    --ink-2: #46536a;
+    --ink-3: #6e7a8e;
+    --line: #dbe2ec;
+    --line-2: #e8edf4;
+    --accent: #0c8e82;
+    --accent-ink: #0a6a61;
+    --accent-wash: #e2f2f0;
+    --ok: #1f8f52;
+    --warn: #b5730f;
+    --crit: #c93a54;
+    --ok-wash: #e4f3ea;
+    --warn-wash: #f6eddc;
+    --crit-wash: #f7e5e9;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+
+  /* ---------- Masthead ---------- */
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(120% 140% at 88% -20%, var(--accent-wash) 0%, transparent 46%);
+  }
+  .masthead .wrap { padding-top: 54px; padding-bottom: 40px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 0 0 18px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-wash);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.72); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .eyebrow::before { animation: none; }
+  }
+  h1 {
+    font-size: clamp(30px, 5.2vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .lead {
+    font-size: clamp(17px, 2.4vw, 19.5px);
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0 0 26px;
+    text-wrap: pretty;
+  }
+  .lead strong { color: var(--ink); font-weight: 650; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+  .meta span {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    padding: 5px 11px;
+    border-radius: 999px;
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Sections ---------- */
+  section { padding: 46px 0; border-bottom: 1px solid var(--line-2); }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+  .sec-no {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent-ink);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  h2 {
+    font-size: clamp(21px, 3vw, 26px);
+    letter-spacing: -0.015em;
+    font-weight: 750;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .sec-sub { color: var(--ink-3); margin: 4px 0 26px; font-size: 15px; }
+
+  /* ---------- Topology ---------- */
+  .topo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin: 8px 0 26px;
+  }
+  .node {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 15px;
+  }
+  .node .role {
+    font-family: var(--mono);
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 7px;
+  }
+  .node .name { font-weight: 700; font-size: 16.5px; margin: 0 0 5px; }
+  .node .desc { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; margin: 0; }
+  .node.hi { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .node.hi .name { color: var(--accent-ink); }
+
+  .thesis {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px 22px;
+    font-size: 16.5px;
+    line-height: 1.62;
+  }
+  .thesis b { color: var(--accent-ink); }
+
+  /* ---------- Index ---------- */
+  .index { columns: 2; column-gap: 34px; margin: 4px 0 0; padding: 0; list-style: none; }
+  .index li { break-inside: avoid; margin-bottom: 9px; }
+  .index a {
+    color: var(--ink-2); text-decoration: none;
+    font-size: 14.5px;
+    display: flex; gap: 9px; align-items: baseline;
+  }
+  .index a:hover { color: var(--accent-ink); }
+  .index .qn { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); flex: none; }
+  @media (max-width: 620px) { .index { columns: 1; } }
+
+  /* ---------- Q&A ---------- */
+  .qa {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 22px 24px;
+    margin-bottom: 14px;
+  }
+  .qa-q { display: flex; gap: 13px; align-items: baseline; margin-bottom: 12px; }
+  .qtag {
+    font-family: var(--mono);
+    font-size: 12px; font-weight: 700;
+    color: var(--accent-ink);
+    background: var(--accent-wash);
+    border-radius: 6px;
+    padding: 3px 8px;
+    flex: none;
+    letter-spacing: 0.02em;
+  }
+  .qa-q h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.4; }
+  .qa-a { color: var(--ink-2); }
+  .qa-a > :first-child { margin-top: 0; }
+  .qa-a > :last-child { margin-bottom: 0; }
+  .qa-a p { margin: 12px 0; }
+  .qa-a strong { color: var(--ink); font-weight: 650; }
+  .qa-a ul { margin: 12px 0; padding-left: 20px; }
+  .qa-a li { margin: 6px 0; }
+  .qa-a code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .kicker {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 2px 0 -2px;
+  }
+
+  /* code block / state machine */
+  .code {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.72;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 15px 17px;
+    overflow-x: auto;
+    margin: 14px 0;
+    color: var(--ink);
+    white-space: pre;
+  }
+  .code .c { color: var(--ink-3); }
+  .code .a { color: var(--accent-ink); font-weight: 600; }
+
+  /* tables */
+  .tbl-scroll { overflow-x: auto; margin: 15px 0; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600;
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { font-size: 0.85em; }
+  .col-mono { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+
+  /* chips */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .chip.ok { color: var(--ok); background: var(--ok-wash); }
+  .chip.warn { color: var(--warn); background: var(--warn-wash); }
+  .chip.crit { color: var(--crit); background: var(--crit-wash); }
+
+  /* callout */
+  .note {
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 15px 0;
+    font-size: 14.5px;
+    line-height: 1.58;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .note.warn { border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); background: var(--warn-wash); }
+  .note.key { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); background: var(--accent-wash); }
+  .note b { color: var(--ink); }
+  .note .lbl {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-3); display: block; margin-bottom: 5px;
+  }
+
+  /* strengths/weaknesses grid */
+  .swt { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 18px 0; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px 19px;
+  }
+  .card h4 {
+    margin: 0 0 12px; font-size: 14px;
+    font-family: var(--mono); letter-spacing: 0.04em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card.pos h4 { color: var(--ok); }
+  .card.neg h4 { color: var(--crit); }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { margin: 8px 0; font-size: 14.5px; color: var(--ink-2); }
+  .card li b { color: var(--ink); }
+
+  a.anchor-self { color: inherit; text-decoration: none; }
+
+  footer { padding: 34px 0 60px; color: var(--ink-3); font-size: 13.5px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; justify-content: space-between; }
+  footer code { font-family: var(--mono); }
+
+  ::selection { background: var(--accent); color: #fff; }
+
+  .backlink {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 12.5px;
+    color: var(--ink-2); text-decoration: none;
+    padding: 16px 0 0;
+  }
+  .backlink:hover { color: var(--accent-ink); }
+  .backlink::before { content: "←"; }
+</style>
+</head>
+<body>
+
+<nav class="wrap"><a class="backlink" href="/">Seokwoo's Dev Blog</a></nav>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">비동기 &amp; 복원력 아키텍처</p>
+    <h1>브로커를 믿지 않는 설계 — 비동기 인프라 Q&amp;A와 회고</h1>
+    <p class="lead">우리 백엔드는 Celery + Redis로 비동기 작업을 돌린다. 하지만 유실 방지의 축은 <strong>브로커의 내구성이 아니라, PostgreSQL을 진실원본으로 둔 주기적 재조정(reconciliation)</strong>에 있다. 나올 법한 질문들에 답하고, 왜 이렇게 설계했는지 강점·단점·트레이드오프까지 정리한다.</p>
+    <div class="meta">
+      <span>범위: <b>Celery · Redis · beat · 재조정</b></span>
+      <span>근거: <b>실제 코드 확인</b></span>
+      <span>기준일: <b>2026-07-08</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ===================== 한눈에 ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">00</span><h2>한눈에 — 구성요소와 역할</h2></div>
+    <p class="sec-sub">각 프로세스는 역할이 분리돼 있다. 무엇이 "전달"하고 무엇이 "실행"하며 무엇이 "진실"인지가 핵심.</p>
+
+    <div class="topo">
+      <div class="node">
+        <p class="role">Web</p>
+        <p class="name">Gunicorn + gevent</p>
+        <p class="desc">HTTP 요청 처리. 무거운 일은 task로 넘김.</p>
+      </div>
+      <div class="node">
+        <p class="role">Transport</p>
+        <p class="name">Redis (broker)</p>
+        <p class="desc">대기 중인 task 메시지를 나르는 큐. 휘발성.</p>
+      </div>
+      <div class="node">
+        <p class="role">Compute</p>
+        <p class="name">Celery worker</p>
+        <p class="desc">큐에서 task를 꺼내 실제로 실행. 여러 대 가능.</p>
+      </div>
+      <div class="node hi">
+        <p class="role">Scheduler</p>
+        <p class="name">Celery beat</p>
+        <p class="desc">정해진 주기에 task를 큐에 발행. 단일 프로세스.</p>
+      </div>
+      <div class="node hi">
+        <p class="role">Source of truth</p>
+        <p class="name">PostgreSQL</p>
+        <p class="desc">상태·결과의 최종 진실원본. 재조정의 기준.</p>
+      </div>
+    </div>
+
+    <div class="thesis">
+      핵심 사상 한 줄: 우리 서버는 Redis를 "믿을 수 있는 저장소"로 취급하지 않는다. Redis는 빠른 전달 파이프일 뿐이고, <b>진짜 안 잃어야 할 것은 전부 PostgreSQL에 상태로 남긴 뒤, 여러 주기적 beat가 그 DB를 다시 읽어 어긋난 것을 맞춘다.</b> 이건 K8s의 reconciliation loop, 그리고 outbox 패턴과 같은 계열의 설계다.
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 인덱스 ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">·</span><h2>질문 인덱스</h2></div>
+    <p class="sec-sub">면접·온보딩에서 나올 법한 순서로.</p>
+    <ul class="index">
+      <li><a href="#q1"><span class="qn">B1</span>Redis는 어디에 쓰나?</a></li>
+      <li><a href="#q2"><span class="qn">B2</span>Redis가 죽으면 어떻게 되나?</a></li>
+      <li><a href="#q3"><span class="qn">B3</span>task가 유실되나? (acks_late)</a></li>
+      <li><a href="#q4"><span class="qn">B4</span>task 결과는 어디에 저장되나?</a></li>
+      <li><a href="#q5"><span class="qn">W1</span>워커가 죽으면?</a></li>
+      <li><a href="#q6"><span class="qn">W2</span>큐를 왜 여러 개로 나눴나?</a></li>
+      <li><a href="#q7"><span class="qn">W3</span>타임아웃 정책은?</a></li>
+      <li><a href="#q8"><span class="qn">S1</span>beat가 뭔가?</a></li>
+      <li><a href="#q9"><span class="qn">S2</span>beat가 죽으면? (SPOF)</a></li>
+      <li><a href="#q10"><span class="qn">S3</span>다운 중 놓친 일정은 backfill 되나?</a></li>
+      <li><a href="#q11"><span class="qn">R1</span>beat는 실행 여부를 어떻게 아나?</a></li>
+      <li><a href="#q12"><span class="qn">R2</span>재조정 예시가 임베딩 말고 또 있나?</a></li>
+      <li><a href="#q13"><span class="qn">R3</span>재처리가 왜 안전한가? (멱등·fencing)</a></li>
+      <li><a href="#q14"><span class="qn">H1</span>Redis HA — 마스터 승격/TTL?</a></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== 브로커 ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">01</span><h2>브로커 &amp; 메시징</h2></div>
+
+    <article class="qa" id="q1">
+      <div class="qa-q"><span class="qtag">B1</span><h3><a class="anchor-self" href="#q1">Redis는 어디에 쓰나?</a></h3></div>
+      <div class="qa-a">
+        <p>세 가지 역할이다. 혼동하면 안 된다.</p>
+        <ul>
+          <li><strong>Celery broker</strong> — 대기 중인 task 메시지 큐 (<code>CELERY_BROKER_URL</code>, <code>rediss://</code>면 TLS 자동).</li>
+          <li><strong>분산 락 / 캐시</strong> — 디스패처 동시성 제어(락 키), 일부 상태 캐시.</li>
+          <li><strong>일시 상태의 TTL 저장소</strong> — 예: 워크플로우 pause 키(TTL 만료를 타임아웃 신호로 활용).</li>
+        </ul>
+        <p>주목할 점: <strong>task 결과 저장에는 안 쓴다</strong>(B4 참고).</p>
+      </div>
+    </article>
+
+    <article class="qa" id="q2">
+      <div class="qa-q"><span class="qtag">B2</span><h3><a class="anchor-self" href="#q2">Redis가 죽으면 어떻게 되나? 휘발되는데?</a></h3></div>
+      <div class="qa-a">
+        <p>persistence(AOF)나 replica가 없으면, <strong>큐에서 대기 중이던 메시지는 사라진다.</strong> 다만 피해는 생각보다 좁고, 세 층으로 방어된다.</p>
+        <ul>
+          <li><span class="chip ok">무사</span> <strong>이미 실행 중인 task</strong> — 워커 메모리에서 돌고 있어 Redis와 무관하게 완료. 결과는 DB에 씀.</li>
+          <li><span class="chip warn">실패</span> <strong>신규 발행</strong>(<code>.delay()</code>) — Redis 연결이 안 되면 발행 자체가 예외. 아래 재조정이 흡수.</li>
+          <li><span class="chip ok">복구</span> <strong>대기 메시지 유실</strong> — "해야 할 일"이 DB에 상태로 남아 있으므로, 주기 beat가 DB를 재스캔해 재발행(R1·R2).</li>
+        </ul>
+        <div class="note key">
+          <span class="lbl">핵심</span>
+          Redis 휘발이 곧 작업 유실이 아니다. 진실원본이 DB라서, Redis는 "다시 채울 수 있는 캐시"에 가깝다.
+        </div>
+      </div>
+    </article>
+
+    <article class="qa" id="q3">
+      <div class="qa-q"><span class="qtag">B3</span><h3><a class="anchor-self" href="#q3">task가 유실될 수 있나? (acks_late)</a></h3></div>
+      <div class="qa-a">
+        <p>순수 Celery 관점에선 <strong>유실될 수 있다.</strong> 우리 설정은 <code>task_acks_late</code>를 지정하지 않아 기본값 <code>False</code>다.</p>
+        <ul>
+          <li><code>acks_late=False</code> → 워커가 task를 <strong>받는 순간 ACK</strong>. 그래서 실행 도중 워커가 죽으면(OOM/SIGKILL) 그 메시지는 이미 큐에서 지워져 <strong>자동 재시도되지 않는다.</strong></li>
+          <li><code>worker_prefetch_multiplier=1</code>이라 선점량이 최소여서 유실 범위는 "진행 중이던 그 1개"로 작다.</li>
+        </ul>
+        <div class="note key">
+          <span class="lbl">그래서 왜 괜찮은가</span>
+          Celery 레벨 재시도가 없어도 <b>DB 재조정 beat</b>가 "멈춘 문서/실행"을 잡아 재큐한다(R2). 유실 방지의 축이 브로커가 아니라 DB에 있다는 증거.
+        </div>
+      </div>
+    </article>
+
+    <article class="qa" id="q4">
+      <div class="qa-q"><span class="qtag">B4</span><h3><a class="anchor-self" href="#q4">task 결과는 어디에 저장되나?</a></h3></div>
+      <div class="qa-a">
+        <p><strong>Redis가 아니라 PostgreSQL.</strong> <code>CELERY_BACKEND</code> 기본값이 <code>database</code>라 결과 backend는 <code>db+postgresql://…</code>로 잡힌다. 게다가 <code>task_ignore_result=True</code>라 결과를 사실상 담지도 않는다.</p>
+        <p>의미: "Redis 죽으면 결과가 날아간다"는 문제는 <strong>애초에 존재하지 않는다.</strong> Redis는 오직 대기 메시지 파이프.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ===================== 워커 ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">02</span><h2>워커</h2></div>
+
+    <article class="qa" id="q5">
+      <div class="qa-q"><span class="qtag">W1</span><h3><a class="anchor-self" href="#q5">워커가 죽으면?</a></h3></div>
+      <div class="qa-a">
+        <p>워커는 여러 대 띄울 수 있어 한 대가 죽어도 다른 워커가 큐를 계속 소비한다. 문제는 <strong>죽은 워커가 실행 중이던 그 task</strong>인데(B3), 이건 재조정으로 복구된다:</p>
+        <div class="code"><span class="c"># 임베딩 예: worker 급사 → 15분 뒤 stale 회수가 되살림</span>
+상태 = <span class="a">처리중</span>
+  <span class="a">AND</span> 처리시작시각 <span class="a">&lt;</span> now - cutoff   <span class="c"># 멈춤 감지</span>
+  → 발행시각 초기화, 상태=<span class="a">대기</span>        <span class="c"># 재큐</span></div>
+        <p>즉 워커 크래시 복구는 Celery가 아니라 <strong>DB 상태 + beat</strong>가 담당한다.</p>
+      </div>
+    </article>
+
+    <article class="qa" id="q6">
+      <div class="qa-q"><span class="qtag">W2</span><h3><a class="anchor-self" href="#q6">큐를 왜 여러 개로 나눴나?</a></h3></div>
+      <div class="qa-a">
+        <p><strong>작업 특성별 격리</strong> 때문. 무거운 인덱싱이 가벼운 메일 발송을 막지 않도록, 그리고 장시간 작업이 짧은 작업의 지연을 유발하지 않도록 큐를 분리하고 워커를 큐별로 배치한다.</p>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr><th>큐</th><th>용도</th></tr></thead>
+            <tbody>
+              <tr><td class="col-mono">dataset</td><td>문서 인덱싱·데이터 처리</td></tr>
+              <tr><td class="col-mono">memory</td><td>메모리 추출·리임베딩</td></tr>
+              <tr><td class="col-mono">longrun</td><td>장시간 실행 Job</td></tr>
+              <tr><td class="col-mono">cleanup</td><td>정리·회수 (재조정 안전망 포함)</td></tr>
+              <tr><td class="col-mono">mail · slack</td><td>알림 발송</td></tr>
+              <tr><td class="col-mono">monitoring</td><td>모니터링·통제 작업</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>라우팅은 <code>task_routes</code>로 선언(예: memory task → <code>memory</code> 큐). 새 큐는 워커 실행 옵션(<code>-Q</code>)에도 등록해야 실제로 소비된다.</p>
+      </div>
+    </article>
+
+    <article class="qa" id="q7">
+      <div class="qa-q"><span class="qtag">W3</span><h3><a class="anchor-self" href="#q7">타임아웃 정책은?</a></h3></div>
+      <div class="qa-a">
+        <p>글로벌 기본 <code>soft_time_limit=600</code>(10분), <code>task_time_limit=660</code>(+1분 버퍼). soft는 graceful 종료 기회를 주고, hard는 강제 kill.</p>
+        <p>10분 넘게 걸리는 task는 <strong>개별로 상향</strong>한다(패턴: <code>time_limit = soft + 60</code>). 예: 인덱싱 30분(1800/1860), 장시간 분석 2시간(7200/7260). soft 초과 시 <code>SoftTimeLimitExceeded</code>를 잡아 정리 작업을 수행.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ===================== beat ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">03</span><h2>beat &amp; 스케줄링</h2></div>
+
+    <article class="qa" id="q8">
+      <div class="qa-q"><span class="qtag">S1</span><h3><a class="anchor-self" href="#q8">beat가 뭔가?</a></h3></div>
+      <div class="qa-a">
+        <p><strong>스케줄러(크론) 프로세스.</strong> 정해진 시각/주기마다 task를 큐에 <strong>발행만</strong> 한다 — 실행은 워커가 한다. 리눅스 <code>cron</code>을 Celery 안으로 가져온 것.</p>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr><th>프로세스</th><th>역할</th><th>비유</th></tr></thead>
+            <tbody>
+              <tr><td class="col-mono">worker</td><td>큐에서 꺼내 <b>실행</b></td><td>요리사</td></tr>
+              <tr><td class="col-mono">beat</td><td>때맞춰 <b>발행</b></td><td>주문 타이머</td></tr>
+              <tr><td class="col-mono">broker</td><td>그 사이 <b>큐</b></td><td>주문 선반</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>우리 재조정 루프(안전망 60초, stale 회수 15분, 앱 스케줄러 매분 등)는 전부 beat가 굴린다. 그래서 이름도 beat(박동).</p>
+      </div>
+    </article>
+
+    <article class="qa" id="q9">
+      <div class="qa-q"><span class="qtag">S2</span><h3><a class="anchor-self" href="#q9">beat가 죽으면? — 이 아키텍처의 급소</a></h3></div>
+      <div class="qa-a">
+        <p>가장 약한 고리다. 정직하게:</p>
+        <ul>
+          <li>재조정 루프를 <strong>전부 beat가 굴리는데, beat 자신은 이중화가 없다.</strong> redbeat·리더선출을 안 쓴다(기본 <code>PersistentScheduler</code>).</li>
+          <li>beat를 2개 띄우면 모든 주기 task가 <strong>2번씩 발화</strong>(중복) → 구조적으로 단일 인스턴스 = <span class="chip crit">SPOF</span></li>
+          <li>워커·Redis 장애는 beat가 자가치유하지만, <strong>beat 장애를 자가치유하는 상위 안전망은 코드에 없다.</strong></li>
+        </ul>
+        <div class="note warn">
+          <span class="lbl">그럼 무엇이 beat를 살리나</span>
+          애플리케이션이 아니라 <b>오케스트레이터</b>(Docker restart policy / K8s liveness probe)가 죽은 beat를 재시작한다. 내결함성이 "이중화"가 아니라 <b>"단일 프로세스 빨리 되살리기"</b>에 위임돼 있다.
+        </div>
+        <p>Java 대응: <code>@Scheduled</code>도 같은 문제라 <strong>ShedLock</strong>(분산락)으로 하나만 활성화한다. 즉 <strong>파이썬 한계가 아니라 "단일 리더 스케줄러" 개념 자체의 성질.</strong></p>
+      </div>
+    </article>
+
+    <article class="qa" id="q10">
+      <div class="qa-q"><span class="qtag">S3</span><h3><a class="anchor-self" href="#q10">다운 중 놓친 일정은 backfill 되나?</a></h3></div>
+      <div class="qa-a">
+        <ul>
+          <li><strong>crontab 기반</strong>(예: 매일 02:00 정리) — 다운타임 중 놓친 실행은 <strong>backfill 안 됨.</strong> 다음 매칭 시각에 정상 발화.</li>
+          <li><strong>interval 기반</strong>(<code>timedelta</code>) — 재시작 시점부터 다시 카운트.</li>
+        </ul>
+        <p>다만 놓친 만큼의 "해야 할 일"은 DB에 남아 있어, <strong>복구 직후 첫 스캔에서 한꺼번에 따라잡는다.</strong> 그 폭주를 막으려고 beat에 <code>options={"expires": N}</code>을 걸어 다음 주기와 안 겹치게 만료시킨다.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ===================== 재조정 ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">04</span><h2>재조정(reconciliation)</h2></div>
+
+    <article class="qa" id="q11">
+      <div class="qa-q"><span class="qtag">R1</span><h3><a class="anchor-self" href="#q11">beat는 "어디까지 실행됐는지" 어떻게 아나?</a></h3></div>
+      <div class="qa-a">
+        <p>beat가 아는 게 아니다. <strong>worker가 진행하면서 자기 발자국을 DB row에 계속 써넣는다.</strong> beat는 그걸 읽고 상태를 역추론할 뿐. 임베딩 예의 상태 컬럼:</p>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr><th>컬럼</th><th>언제 채워지나</th><th>의미</th></tr></thead>
+            <tbody>
+              <tr><td class="col-mono">큐 등록 시각</td><td>디스패처 경유 등록</td><td>"재조정 대상" 표식</td></tr>
+              <tr><td class="col-mono">발행 시각</td><td>큐에 발행한 시각</td><td>발행됨, 실행은 아직</td></tr>
+              <tr><td class="col-mono">처리시작 시각</td><td>워커가 처리 시작</td><td>실행 시작함</td></tr>
+              <tr><td class="col-mono">진행 상태</td><td>단계 진행마다</td><td>대기→…→완료/오류</td></tr>
+              <tr><td class="col-mono">세대 번호</td><td>회수 시 +1</td><td>fencing token</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code"><span class="c"># beat는 컬럼 조합 + 경과시간으로 상황을 분류</span>
+대기 + 큐등록✓ + 발행시각 없음        → <span class="a">즉시 발행</span>
+대기 + 발행✓ 인데 2h 경과              → <span class="a">재큐</span> <span class="c"># 브로커 소실</span>
+처리중 + 처리시작시각 임계 초과         → <span class="a">재큐</span> <span class="c"># 워커 급사</span></div>
+        <div class="note warn">
+          <span class="lbl">중요한 한계</span>
+          beat가 아는 진행은 <b>거친 체크포인트뿐</b>이다. "500청크 중 300개 했다"는 모른다. 그래서 재처리는 <b>문서 단위 통째</b>로 다시 하고, 그 안전장치가 멱등성이다(R3).
+        </div>
+      </div>
+    </article>
+
+    <article class="qa" id="q12">
+      <div class="qa-q"><span class="qtag">R2</span><h3><a class="anchor-self" href="#q12">재조정 예시가 임베딩 말고 또 있나?</a></h3></div>
+      <div class="qa-a">
+        <p>임베딩은 <strong>가장 최근 사례일 뿐,</strong> 같은 골격이 여러 도메인에 이미 있다. 성격별로:</p>
+        <p class="kicker">A. 장애 복구형</p>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr><th>사례</th><th>상태원본</th><th>주기</th><th>특징</th></tr></thead>
+            <tbody>
+              <tr><td>임베딩 회수</td><td class="col-mono">status·*_at</td><td>15분</td><td>기준 사례</td></tr>
+              <tr><td>워크플로우 stale</td><td class="col-mono">실행 상태 + 시각</td><td>5분</td><td>finally 유실분 2차 방어</td></tr>
+              <tr><td>장시간 Job stale</td><td class="col-mono">하트비트 시각</td><td>5분</td><td><b>하트비트</b> 방식</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="kicker">B. 시간 만료형</p>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr><th>사례</th><th>상태원본</th><th>주기</th><th>특징</th></tr></thead>
+            <tbody>
+              <tr><td>Interrupt 타임아웃</td><td class="col-mono">PAUSED + Redis TTL</td><td>5분</td><td><b>Redis 휘발을 신호로</b></td></tr>
+              <tr><td>API 키풀 복구</td><td class="col-mono">리셋 예정 시각</td><td>1분</td><td>시각 지나면 복귀</td></tr>
+              <tr><td>앱 차단 자동해제</td><td class="col-mono">차단 만료 시각</td><td>1분</td><td>멱등 명시</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>두 가지가 임베딩엔 없던 새 변형이다:</p>
+        <ul>
+          <li><strong>하트비트</strong>(장시간 Job) — 단일 시작시각으론 "정상적으로 오래 걸림"과 "죽어서 멈춤"을 구분 못 한다. 실행 중 계속 하트비트 시각을 갱신하면 그 둘을 정확히 구분.</li>
+          <li><strong>Redis TTL + DB 이중상태</strong>(Interrupt) — pause를 Redis 키(TTL)+DB <code>PAUSED</code>로 둔다. Redis 키가 만료·소실되면 → "타임아웃"으로 판정해 DB를 <code>FAILED</code>로 마감. <strong>Redis의 휘발성을 오히려 신호로 쓴다.</strong></li>
+        </ul>
+        <p>가장 근본은 <strong>앱 스케줄러</strong>(매분): "DB(스케줄 설정)를 진실원본으로, beat가 주기적으로 읽어 행동"하는 패턴의 원형이다.</p>
+      </div>
+    </article>
+
+    <article class="qa" id="q13">
+      <div class="qa-q"><span class="qtag">R3</span><h3><a class="anchor-self" href="#q13">재처리가 중복 실행일 텐데 왜 안전한가?</a></h3></div>
+      <div class="qa-a">
+        <p>이 모델은 <strong>at-least-once</strong>다(최소 한 번, 중복 가능). 그래서 두 안전장치가 필수다:</p>
+        <ul>
+          <li><strong>멱등성(idempotency)</strong> — 같은 작업을 다시 해도 결과가 같아야 함. 예: 같은 청크를 재삽입해도 중복 row가 안 생기게.</li>
+          <li><strong>fencing token</strong>(세대 번호) — 죽은 줄 알고 재발행했는데 원래 워커가 되살아나 둘이 동시에 돌면? 회수 시 세대를 +1 해서 <strong>낡은 세대의 write를 무시</strong>, 정합성을 보존.</li>
+        </ul>
+        <p>이 둘이 없으면 재조정은 곧 데이터 오염이 된다. 그래서 "재조정 설계 = 멱등 설계"가 세트다.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ===================== HA ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">05</span><h2>Redis 고가용성</h2></div>
+
+    <article class="qa" id="q14">
+      <div class="qa-q"><span class="qtag">H1</span><h3><a class="anchor-self" href="#q14">마스터-슬레이브 승격이나 TTL 같은 게 있나?</a></h3></div>
+      <div class="qa-a">
+        <p><strong>있다 — Redis Sentinel(옵션).</strong> <code>CELERY_USE_SENTINEL=true</code>면 broker transport에 <code>master_name</code>과 sentinel 설정이 붙는다.</p>
+        <ul>
+          <li>Sentinel이 마스터를 감시하다 죽으면 <strong>슬레이브를 새 마스터로 자동 승격</strong>(failover). 클라이언트는 Sentinel에 물어 새 마스터로 재접속. Kafka 파티션 리더 재선출과 같은 개념.</li>
+          <li><strong>주의:</strong> 기본값은 <code>off</code>. 프로덕션 HA가 필요하면 Sentinel(또는 managed Redis failover)을 반드시 켜야 한다 — 안 켜면 단일 Redis가 SPOF.</li>
+        </ul>
+        <p>TTL 관점: 브로커 <strong>대기 메시지엔 TTL이 없다</strong>(워커가 가져갈 때까지 유지). 대신 beat 스케줄에 <code>expires</code>를 걸어 복구 시점 폭주를 막고, 애플리케이션 상태(pause 등)엔 Redis TTL을 걸어 타임아웃 신호로 쓴다(R2). <code>visibility_timeout</code>은 명시 설정이 없어 Redis 트랜스포트 기본값(1시간)이며, <code>acks_late</code>를 안 쓰는 현 구성에선 실질 영향이 작다.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ===================== 설계 회고 ===================== -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">06</span><h2>왜 이렇게 설계했나 — 회고</h2></div>
+    <p class="sec-sub">자바의 Kafka+outbox 결제 방어와 비교하며. 결론: 잘못된 설계가 아니라 워크로드에 맞춘 의도된 트레이드오프.</p>
+
+    <div class="note key" style="font-size:16px;">
+      <span class="lbl">설계 의도</span>
+      "진짜 안 잃어야 할 상태는 이미 PostgreSQL에 있다. 그러면 브로커 내구성에 돈·복잡도를 쓸 게 아니라, <b>DB를 주기적으로 재조정하면 된다.</b>" — Kafka+outbox의 앞부분(브로커 내구성)을 생략하고, 진짜 안전망인 뒷부분(DB 재조정)만 남긴 선택.
+    </div>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>선택지</th><th>장점</th><th>단점</th><th>우리 판단</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>A. Kafka 도입</b><br>(자바식)</td>
+            <td>내구성·순서보장·오프셋 되감기</td>
+            <td>운영·학습 비용 큼</td>
+            <td><span class="chip warn">과설계</span> 백그라운드 작업엔 이득&lt;비용</td>
+          </tr>
+          <tr>
+            <td><b>B. Redis durability</b><br>(AOF·Sentinel)</td>
+            <td>대기 메시지 휘발 감소</td>
+            <td>여전히 브로커를 "믿음", 워커 크래시 유실은 못 막음</td>
+            <td><span class="chip ok">부분 채택</span> Sentinel은 옵션 제공</td>
+          </tr>
+          <tr>
+            <td><b>C. DB 재조정</b><br>(채택)</td>
+            <td>브로커를 안 믿음 → 휘발·크래시와 무관, 가벼움</td>
+            <td>지연(폴링)·멱등 강제·beat SPOF</td>
+            <td><span class="chip ok">채택</span> 가장 튼튼한 층만 취함</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="swt">
+      <div class="card pos">
+        <h4>강점</h4>
+        <ul>
+          <li><b>브로커 비의존</b> — Redis 휘발·워커 크래시가 최종 정합성을 깨지 못한다.</li>
+          <li><b>검증된 사상</b> — K8s reconciliation, outbox의 backstop과 동일 계열.</li>
+          <li><b>가벼움</b> — Kafka 없이 이미 있는 DB만으로 복원력 확보.</li>
+          <li><b>도메인 확장 용이</b> — 상태 컬럼 + beat만 추가하면 새 재조정이 생긴다(이미 7+ 사례).</li>
+        </ul>
+      </div>
+      <div class="card neg">
+        <h4>단점 / 트레이드오프</h4>
+        <ul>
+          <li><b>복구 지연</b> — 즉시가 아니라 다음 주기(수 분). 초 단위 정확성엔 부적합.</li>
+          <li><b>at-least-once</b> — 중복 실행 가능 → 모든 task 멱등 강제.</li>
+          <li><b>beat SPOF</b> — 재조정의 심장이 단일. 코드가 아닌 <b>운영(restart/liveness)</b>이 책임.</li>
+          <li><b>exactly-once 불가</b> — 강한 트랜잭션 보장이 필요한 도메인엔 부족.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="lbl">파이썬 한계인가?</span>
+      <b>아니다.</b> Java로 짜도 같은 구조가 나온다: <code>@Scheduled</code>/Quartz = beat, ShedLock = redbeat(분산락), Spring Batch = 재조정 잡. beat SPOF는 언어가 아니라 "단일 리더 스케줄러" 개념의 성질이다.
+    </div>
+
+    <div class="note warn">
+      <span class="lbl">재설계 시그널</span>
+      강한 순서보장이나 exactly-once가 요구되는 도메인(예: <b>결제</b>)이 생기면 — 그때는 Kafka + transactional outbox 정통 구현을 도입할 값어치가 있다. 지금 워크로드(임베딩·인덱싱·정리·토큰갱신)엔 현 구조가 맞다. 유일하게 규율이 필요한 곳은 <b>"배포에서 beat가 restart/liveness로 확실히 살아있게 걸려 있는가"</b> 하나.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>비동기 인프라 아키텍처 · Q&amp;A와 설계 회고</span>
+    <span><code>Celery 5.4 · Redis · PostgreSQL</code></span>
+  </div>
+</footer>
+</body>
+</html>
