@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-05",
+  "generated": "2026-07-14",
   "edges": [
     { "from": "aws-ec2-credential-chain", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" },
     { "from": "aws-ec2-credential-chain", "to": "kubernetes-volume-model-pv-pvc-accessmode", "reason": "본문 링크" },
@@ -11,6 +11,18 @@
     { "from": "flask-gunicorn-gevent-architecture", "to": "python-web-server-async-stack", "reason": "tag: gunicorn / gevent / Python" },
     { "from": "db-connection-pool-from-scratch", "to": "flask-gunicorn-gevent-architecture", "reason": "본문 링크" },
     { "from": "db-connection-pool-from-scratch", "to": "python-web-server-async-stack", "reason": "본문 링크" },
-    { "from": "db-connection-pool-from-scratch", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" }
+    { "from": "db-connection-pool-from-scratch", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" },
+    { "from": "aws-dop-c02-overview", "to": "aws-ec2-credential-chain", "reason": "본문 링크" },
+    { "from": "aws-dop-c02-overview", "to": "flask-gunicorn-gevent-architecture", "reason": "본문 링크" },
+    { "from": "aws-dop-c02-overview", "to": "kubernetes-desired-state-reconciliation", "reason": "본문 링크" },
+    { "from": "aws-dop-c02-overview", "to": "kubernetes-volume-model-pv-pvc-accessmode", "reason": "본문 링크" },
+    { "from": "aws-dop-c02-overview", "to": "miso-sheet-analysis-eks-migration", "reason": "본문 링크" },
+    { "from": "aws-dop-c02-overview", "to": "python-web-server-async-stack", "reason": "본문 링크" },
+    { "from": "celery-redis-beat-reconciliation", "to": "flask-gunicorn-gevent-architecture", "reason": "본문 링크" },
+    { "from": "celery-redis-beat-reconciliation", "to": "kubernetes-desired-state-reconciliation", "reason": "본문 링크" },
+    { "from": "git-submodule-pointer-and-ci", "to": "db-connection-pool-from-scratch", "reason": "본문 링크" },
+    { "from": "git-submodule-pointer-and-ci", "to": "kubernetes-desired-state-reconciliation", "reason": "본문 링크" },
+    { "from": "mysql-innodb-mvcc-read-view", "to": "db-connection-pool-from-scratch", "reason": "본문 링크" },
+    { "from": "mysql-innodb-mvcc-read-view", "to": "celery-redis-beat-reconciliation", "reason": "본문 링크" }
   ]
 }
